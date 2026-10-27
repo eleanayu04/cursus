@@ -5,8 +5,9 @@ Next.js (App Router) + Postgres, deployed on [Floo](https://getfloo.com).
 
 ## How it works
 
-- **Sign-in**: `@duke.edu` email + 6-digit code (`src/lib/auth.ts`). Sessions are
-  random tokens in an httpOnly cookie, hashed in the `sessions` table.
+- **Sign-in**: Floo accounts mode. Floo's gateway signs people in (invite-only)
+  and passes `X-Floo-User-*` headers; `src/lib/auth.ts` maps them to a Cursus
+  user. Only `@duke.edu` accounts get in, plus app admins for testing.
 - **Rating**: pick Liked / Fine / Disliked, add optional notes, then answer
   head-to-head comparisons against your other courses in that bucket (binary
   insertion, `src/lib/rating.ts`). Scores are spread evenly across the bucket's
@@ -26,22 +27,19 @@ npm run dev:local
 ```
 
 `dev:local` starts an embedded Postgres (PGlite, stored in `.pglite/`), applies
-migrations, and runs `next dev` on http://localhost:3000. Login codes are printed
-in the terminal instead of emailed. Delete `.pglite/` to reset the database.
+migrations, and runs `next dev` on http://localhost:3000. With no Floo gateway
+locally, you're signed in as `DEV_USER_EMAIL` (default `dev@duke.edu`); send an
+`X-Floo-User-Email` header to act as someone else. Delete `.pglite/` to reset
+the database.
 
 ## Deploy to Floo
 
-`floo.app.toml` defines one web service + managed Postgres. Migrations run
-automatically on each deploy (`node db/migrate.mjs`), and a nightly cron cleans
-up expired sessions.
+`floo.app.toml` defines one web service + managed Postgres in accounts mode.
+Migrations run automatically on each deploy (`node db/migrate.mjs`).
 
 1. Push this repo to GitHub and connect it: `floo apps github connect`.
-2. Set secrets:
-   - `AUTH_SECRET` (required): `openssl rand -base64 32 | floo env set AUTH_SECRET --stdin`
-   - Email (Floo has no email service): `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`,
-     `SMTP_PASS`, optionally `EMAIL_FROM`. Any SMTP provider works, e.g. Gmail with
-     an app password. Without SMTP, set `LOG_LOGIN_CODES=1` and read codes from
-     `floo logs`.
+2. Invite users (accounts mode is invite-only):
+   `floo apps invite someone@duke.edu --role member --app cursus`
 3. Pushes to `main` deploy to dev; a GitHub release promotes to prod.
 
 ## Course catalog

@@ -1,8 +1,15 @@
 [app]
 name = "cursus"
-# Sign-in is Cursus's own @duke.edu email codes, not Floo accounts mode
-# (which is invite-only and can't admit a whole email domain).
-access_mode = "public"
+# Floo's gateway handles sign-in and passes X-Floo-User-* headers.
+# Accounts mode is invite-only: add people with `floo apps invite`.
+access_mode = "accounts"
+
+[auth]
+access_policy = "invite"
+
+[auth.branding]
+display_name = "Cursus"
+accent_color = "#1d3f8f"
 
 [services.web]
 type = "web"
@@ -13,13 +20,7 @@ dev_command = "npm run dev"
 migrate_command = "node db/migrate.mjs"
 
 [services.web.env]
-required = ["AUTH_SECRET"]
-optional = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "EMAIL_FROM", "LOG_LOGIN_CODES", "DUKE_API_TOKEN"]
+optional = ["DUKE_API_TOKEN"]
 
 [managed.default]
 type = "postgres"
-
-[cron.cleanup-auth]
-schedule = "17 4 * * *"
-command = "node scripts/cleanup-auth.mjs"
-service = "web"

@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { acceptFriendRequest, removeFriend, signOut } from "@/app/actions";
+import { acceptFriendRequest, removeFriend } from "@/app/actions";
 import { CopyLink } from "@/components/CopyLink";
+import { SignOutButton } from "@/components/SignOutButton";
 import { Card, PageHeader } from "@/components/ui";
 import { requireProfile } from "@/lib/auth";
 import {
@@ -144,11 +145,9 @@ export default async function ProfilePage({
         )}
       </section>
 
-      <form action={signOut} className="px-4">
-        <button className="w-full rounded-xl border border-line bg-surface py-3 text-sm font-semibold text-muted">
-          Sign out
-        </button>
-      </form>
+      <div className="px-4">
+        <SignOutButton />
+      </div>
     </div>
   );
 }

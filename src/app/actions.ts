@@ -2,17 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import {
-  endSession,
-  getCurrentUser,
-  issueLoginCode,
-  normalizeDukeEmail,
-  redeemLoginCode,
-  requireProfile,
-  startSession,
-} from "@/lib/auth";
+import { getCurrentUser, requireProfile } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { sendLoginCode } from "@/lib/email";
 import {
   acceptFriend,
   removeFriendship,
@@ -31,52 +22,13 @@ function safeNext(next: unknown): string {
 }
 
 // ---------------------------------------------------------------------------
-// Sign-in
+// Onboarding (sign-in itself is Floo's gateway)
 // ---------------------------------------------------------------------------
-
-export async function requestCode(rawEmail: string): Promise<Result<{ email: string }>> {
-  const email = normalizeDukeEmail(rawEmail);
-  if (!email) return { ok: false, error: "Use your @duke.edu email address." };
-
-  const code = await issueLoginCode(email);
-  if (!code) return { ok: true, email }; // already sent one moments ago
-  try {
-    await sendLoginCode(email, code);
-  } catch (err) {
-    console.error(err);
-    return { ok: false, error: "Couldn't send the code. Try again in a minute." };
-  }
-  return { ok: true, email };
-}
-
-export async function verifyCode(
-  rawEmail: string,
-  code: string,
-  next: string,
-): Promise<Result<{ redirectTo: string }>> {
-  const email = normalizeDukeEmail(rawEmail);
-  if (!email || !/^\d{6}$/.test(code.trim())) {
-    return { ok: false, error: "Enter the 6-digit code from your email." };
-  }
-  const user = await redeemLoginCode(email, code);
-  if (!user) return { ok: false, error: "That code is wrong or expired." };
-
-  await startSession(user.id);
-  const dest = safeNext(next);
-  return {
-    ok: true,
-    redirectTo: user.username ? dest : `/onboarding?next=${encodeURIComponent(dest)}`,
-  };
-}
-
-export async function signOut() {
-  await endSession();
-  redirect("/login");
-}
 
 export async function completeProfile(formData: FormData) {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) throw new Error("Not signed in");
+  if (!user.isDuke && !user.isAdmin) redirect("/duke-only");
 
   const username = String(formData.get("username") ?? "").trim().toLowerCase().replace(/^@/, "");
   const fullName = String(formData.get("full_name") ?? "").trim();
