@@ -38,8 +38,10 @@ up expired sessions.
 1. Push this repo to GitHub and connect it: `floo apps github connect`.
 2. Set secrets:
    - `AUTH_SECRET` (required): `openssl rand -base64 32 | floo env set AUTH_SECRET --stdin`
-   - Email: `RESEND_API_KEY` and `EMAIL_FROM` (Floo has no email service). For a
-     demo without email, set `LOG_LOGIN_CODES=1` and read codes from `floo logs`.
+   - Email (Floo has no email service): `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`,
+     `SMTP_PASS`, optionally `EMAIL_FROM`. Any SMTP provider works, e.g. Gmail with
+     an app password. Without SMTP, set `LOG_LOGIN_CODES=1` and read codes from
+     `floo logs`.
 3. Pushes to `main` deploy to dev; a GitHub release promotes to prod.
 
 ## Course catalog

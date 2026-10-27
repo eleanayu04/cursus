@@ -14,7 +14,7 @@ migrate_command = "node db/migrate.mjs"
 
 [services.web.env]
 required = ["AUTH_SECRET"]
-optional = ["RESEND_API_KEY", "EMAIL_FROM", "LOG_LOGIN_CODES", "DUKE_API_TOKEN"]
+optional = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "EMAIL_FROM", "LOG_LOGIN_CODES", "DUKE_API_TOKEN"]
 
 [managed.default]
 type = "postgres"
