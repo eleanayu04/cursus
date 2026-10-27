@@ -1,0 +1,25 @@
+[app]
+name = "cursus"
+# Sign-in is Cursus's own @duke.edu email codes, not Floo accounts mode
+# (which is invite-only and can't admit a whole email domain).
+access_mode = "public"
+
+[services.web]
+type = "web"
+path = "."
+port = 3000
+ingress = "public"
+dev_command = "npm run dev"
+migrate_command = "node db/migrate.mjs"
+
+[services.web.env]
+required = ["AUTH_SECRET"]
+optional = ["RESEND_API_KEY", "EMAIL_FROM", "LOG_LOGIN_CODES", "DUKE_API_TOKEN"]
+
+[managed.default]
+type = "postgres"
+
+[cron.cleanup-auth]
+schedule = "17 4 * * *"
+command = "node scripts/cleanup-auth.mjs"
+service = "web"

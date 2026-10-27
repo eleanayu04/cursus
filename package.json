@@ -4,24 +4,33 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:local": "pglite-server --db=.pglite --port=55432 --max-connections=10 --include-database-url --run \"npm run dev:migrated\"",
+    "dev:migrated": "node db/migrate.mjs && next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migrate": "node db/migrate.mjs",
+    "import:courses": "node scripts/import-duke-courses.mjs"
   },
   "dependencies": {
+    "next": "15.5.4",
+    "pg": "^8.23.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "next": "15.5.4"
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@electric-sql/pglite": "^0.5.12",
+    "@electric-sql/pglite-socket": "^0.2.15",
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
-    "@eslint/eslintrc": "^3"
+    "tailwindcss": "^4",
+    "typescript": "^5"
   }
 }

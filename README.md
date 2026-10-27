@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cursus
 
-## Getting Started
+Rank the Duke courses you've taken, Beli-style, and see what your friends thought.
+Next.js (App Router) + Postgres, deployed on [Floo](https://getfloo.com).
 
-First, run the development server:
+## How it works
+
+- **Sign-in**: `@duke.edu` email + 6-digit code (`src/lib/auth.ts`). Sessions are
+  random tokens in an httpOnly cookie, hashed in the `sessions` table.
+- **Rating**: pick Liked / Fine / Disliked, add optional notes, then answer
+  head-to-head comparisons against your other courses in that bucket (binary
+  insertion, `src/lib/rating.ts`). Scores are spread evenly across the bucket's
+  range — Disliked 0–3.3, Fine 3.4–6.7, Liked 6.8–10 — and recomputed on every
+  insert (`rescore_bucket` in `db/migrations/001_init.sql`).
+- **Unlocking**: scores are hidden, and excluded from campus averages, until a user
+  has rated 4 courses.
+- **Privacy**: all access rules live in `src/lib/queries.ts`. Friends always see
+  your score; notes are public-anonymous, friends-only, or private per rating.
+  Public notes from non-friends are returned with no identity at all.
+
+## Run locally
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev:local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`dev:local` starts an embedded Postgres (PGlite, stored in `.pglite/`), applies
+migrations, and runs `next dev` on http://localhost:3000. Login codes are printed
+in the terminal instead of emailed. Delete `.pglite/` to reset the database.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deploy to Floo
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`floo.app.toml` defines one web service + managed Postgres. Migrations run
+automatically on each deploy (`node db/migrate.mjs`), and a nightly cron cleans
+up expired sessions.
 
-## Learn More
+1. Push this repo to GitHub and connect it: `floo apps github connect`.
+2. Set secrets:
+   - `AUTH_SECRET` (required): `openssl rand -base64 32 | floo env set AUTH_SECRET --stdin`
+   - Email: `RESEND_API_KEY` and `EMAIL_FROM` (Floo has no email service). For a
+     demo without email, set `LOG_LOGIN_CODES=1` and read codes from `floo logs`.
+3. Pushes to `main` deploy to dev; a GitHub release promotes to prod.
 
-To learn more about Next.js, take a look at the following resources:
+## Course catalog
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`db/migrations/002_sample_courses.sql` seeds ~65 sample courses. To load the real
+catalog, get a token at https://streamer.oit.duke.edu and run:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+DUKE_API_TOKEN=... DATABASE_URL=... npm run import:courses -- ECON   # one subject first
+DUKE_API_TOKEN=... DATABASE_URL=... npm run import:courses           # everything
+```
