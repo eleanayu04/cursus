@@ -10,7 +10,7 @@ export function CopyLink({ path }: { path: string }) {
 
   return (
     <div className="flex items-center gap-2">
-      <code className="min-w-0 flex-1 truncate rounded-lg bg-bg px-3 py-2 text-xs">{url}</code>
+      <code className="min-w-0 flex-1 truncate rounded-lg bg-subtle px-3 py-2 text-xs">{url}</code>
       <button
         onClick={async () => {
           try {

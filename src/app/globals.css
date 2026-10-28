@@ -1,11 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #f6f5f2;
+  --bg: #ffffff;
   --surface: #ffffff;
+  --subtle: #f3f5f9;
   --ink: #16181d;
-  --muted: #6b6f78;
-  --line: #e6e4df;
+  --muted: #6b7280;
+  --line: #e5e7eb;
   --accent: #1d3f8f;
   --accent-soft: #e8eefb;
   --liked: #17924a;
@@ -16,6 +17,7 @@
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
+  --color-subtle: var(--subtle);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-line: var(--line);
@@ -24,7 +26,7 @@
   --color-liked: var(--liked);
   --color-fine: var(--fine);
   --color-disliked: var(--disliked);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-public-sans);
 }
 
 html {
@@ -34,7 +36,8 @@ html {
 body {
   background: var(--bg);
   color: var(--ink);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  /* the next/font variable directly: @theme inline doesn't emit --font-sans */
+  font-family: var(--font-public-sans), system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
 

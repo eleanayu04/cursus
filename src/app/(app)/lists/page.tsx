@@ -18,7 +18,7 @@ export default async function ListsPage({
   return (
     <>
       <PageHeader title="My lists" />
-      <div className="mx-4 mb-3 flex rounded-xl bg-line/60 p-1 text-sm font-medium">
+      <div className="mx-4 mb-3 flex rounded-xl bg-subtle p-1 text-sm font-medium">
         {[
           { key: "rated", label: `Rated · ${ratings.length}` },
           { key: "want", label: `Want to take · ${wants.length}` },

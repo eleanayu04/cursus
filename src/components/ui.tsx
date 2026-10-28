@@ -51,7 +51,7 @@ export function Card({ children, className = "" }: { children: React.ReactNode; 
 
 export function CourseRow({ course, href }: { course: CourseWithStats; href: string }) {
   return (
-    <Link href={href} className="flex items-center gap-3 px-4 py-3 active:bg-bg">
+    <Link href={href} className="flex items-center gap-3 px-4 py-3 active:bg-subtle">
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold">{course.code}</div>
         <div className="truncate text-sm text-muted">{course.title}</div>
@@ -117,7 +117,7 @@ export function NoteDetails({
       {tags.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {tags.map((t) => (
-            <span key={t} className="rounded-full bg-bg px-2 py-0.5 text-xs text-muted">
+            <span key={t} className="rounded-full bg-subtle px-2 py-0.5 text-xs text-muted">
               {t}
             </span>
           ))}
