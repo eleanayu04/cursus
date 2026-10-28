@@ -68,7 +68,7 @@ export async function CourseSearch({
           {subjects.map((s) => (
             <Link
               key={s.code}
-              href={`${basePath}?subject=${s.code}`}
+              href={`${basePath}?subject=${encodeURIComponent(s.code)}`}
               className="rounded-2xl border border-line bg-surface px-3 py-3"
             >
               <div className="text-sm font-semibold">{s.code}</div>
