@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { rateCourse } from "@/app/actions";
+import { editRatingNotes, rateCourse, rerankCourse } from "@/app/actions";
 import { ScoreBadge } from "@/components/ui";
+import type { MyRating } from "@/lib/queries";
 import {
   answer,
   BUCKETS,
@@ -48,28 +49,38 @@ function recentSemesters(): string[] {
 
 export function RateFlow({
   course,
-  alreadyRated,
+  existing,
+  mode,
   ratedCount,
   buckets,
 }: {
   course: Course;
-  alreadyRated: boolean;
+  existing: MyRating | null;
+  /** new: first rating; edit: notes only; rerank: redo bucket + comparisons */
+  mode: "new" | "edit" | "rerank";
   ratedCount: number;
   buckets: Record<Bucket, Ranked[]>;
 }) {
   const router = useRouter();
-  const [step, setStep] = useState<"bucket" | "details" | "compare" | "done">("bucket");
-  const [bucket, setBucket] = useState<Bucket | null>(null);
+  // edit/rerank only make sense for a course you've rated
+  const [flow] = useState(existing ? mode : "new");
+  // saving revalidates the page and swaps `existing` for the updated rating;
+  // keep the one we started from
+  const [original] = useState(existing);
+  const [step, setStep] = useState<"bucket" | "details" | "compare" | "done">(
+    flow === "edit" ? "details" : "bucket",
+  );
+  const [bucket, setBucket] = useState<Bucket | null>(flow === "edit" ? existing!.bucket : null);
   const [search, setSearch] = useState<Search>({ lo: 0, hi: 0 });
   const [asked, setAsked] = useState(0);
   const [details, setDetails] = useState({
-    professor: "",
-    semester: "",
-    workload: null as number | null,
-    attendance: null as boolean | null,
-    grading: "",
-    note: "",
-    visibility: "public" as Visibility,
+    professor: existing?.professor ?? "",
+    semester: existing?.semester ?? "",
+    workload: existing?.workload ?? (null as number | null),
+    attendance: existing?.attendance ?? (null as boolean | null),
+    grading: existing?.grading ?? "",
+    note: existing?.note ?? "",
+    visibility: existing?.visibility ?? ("public" as Visibility),
   });
   const [result, setResult] = useState<{ score: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -77,17 +88,25 @@ export function RateFlow({
 
   const others = bucket ? buckets[bucket] : [];
 
-  if (alreadyRated && !result) {
+  if (existing && flow === "new" && !result) {
     return (
       <div className="px-4 pt-16 text-center">
         <h1 className="text-xl font-bold">You already rated {course.code}</h1>
-        <p className="mt-1 text-sm text-muted">Re-ranking a course is coming later.</p>
-        <Link
-          href={`/course/${course.id}`}
-          className="mt-6 inline-block rounded-xl bg-accent px-5 py-3 font-semibold text-white"
-        >
-          View course
-        </Link>
+        <p className="mt-1 text-sm text-muted">Change your notes or redo its ranking.</p>
+        <div className="mx-auto mt-6 grid max-w-xs gap-2">
+          <Link
+            href={`/rate/${course.id}?mode=rerank`}
+            className="rounded-xl bg-accent py-3 font-semibold text-white"
+          >
+            Re-rank
+          </Link>
+          <Link
+            href={`/rate/${course.id}?mode=edit`}
+            className="rounded-xl border border-line bg-surface py-3 font-semibold"
+          >
+            Edit notes
+          </Link>
+        </div>
       </div>
     );
   }
@@ -96,14 +115,26 @@ export function RateFlow({
     if (!bucket) return;
     setError(null);
     startTransition(async () => {
-      const res = await rateCourse({ courseId: course.id, bucket, rank, ...details });
+      const submit = flow === "rerank" ? rerankCourse : rateCourse;
+      const res = await submit({ courseId: course.id, bucket, rank, ...details });
       if (!res.ok) return setError(res.error);
       setResult({ score: res.score, total: res.total });
       setStep("done");
     });
   };
 
+  const saveNotes = () => {
+    setError(null);
+    startTransition(async () => {
+      const res = await editRatingNotes(course.id, details);
+      if (!res.ok) return setError(res.error);
+      setResult({ score: original!.score, total: ratedCount });
+      setStep("done");
+    });
+  };
+
   const afterDetails = () => {
+    if (flow === "edit") return saveNotes();
     if (!bucket) return;
     if (others.length === 0) return save(0);
     setSearch(startSearch(others.length));
@@ -120,17 +151,21 @@ export function RateFlow({
   return (
     <div className="flex min-h-[calc(100dvh-6rem)] flex-col px-4 pt-6">
       <div className="flex items-center justify-between">
-        <button
-          onClick={() =>
-            step === "bucket" || step === "done"
-              ? router.back()
-              : setStep(step === "compare" ? "details" : "bucket")
-          }
-          className="text-sm text-muted"
-          disabled={pending}
-        >
-          ← {step === "bucket" || step === "done" ? "Back" : "Previous"}
-        </button>
+        {(() => {
+          // the first screen of the flow goes back to wherever you came from
+          const first = step === "bucket" || step === "done" || (flow === "edit" && step === "details");
+          return (
+            <button
+              onClick={() =>
+                first ? router.back() : setStep(step === "compare" ? "details" : "bucket")
+              }
+              className="text-sm text-muted"
+              disabled={pending}
+            >
+              ← {first ? "Back" : "Previous"}
+            </button>
+          );
+        })()}
         <span className="text-xs text-muted">{course.code}</span>
       </div>
 
@@ -138,7 +173,9 @@ export function RateFlow({
         <section className="mt-6">
           <p className="text-sm font-semibold text-accent">{course.code}</p>
           <h1 className="text-2xl leading-tight font-bold">{course.title}</h1>
-          <p className="mt-6 mb-3 font-medium">How was it?</p>
+          <p className="mt-6 mb-3 font-medium">
+            {flow === "rerank" ? "Looking back, how was it?" : "How was it?"}
+          </p>
           <div className="space-y-3">
             {(Object.keys(BUCKETS) as Bucket[]).map((b) => (
               <button
@@ -155,6 +192,9 @@ export function RateFlow({
                   aria-hidden
                 />
                 {BUCKETS[b].label}
+                {flow === "rerank" && original?.bucket === b && (
+                  <span className="ml-auto text-xs font-medium text-muted">Current</span>
+                )}
               </button>
             ))}
           </div>
@@ -164,8 +204,14 @@ export function RateFlow({
       {step === "details" && (
         <section className="mt-6 space-y-5">
           <div>
-            <h1 className="text-xl font-bold">Add notes</h1>
-            <p className="text-sm text-muted">All optional — helps other students decide.</p>
+            <h1 className="text-xl font-bold">
+              {flow === "new" ? "Add notes" : `Edit notes · ${course.code}`}
+            </h1>
+            <p className="text-sm text-muted">
+              {flow === "edit"
+                ? "Your ranking stays the same."
+                : "All optional — helps other students decide."}
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -263,7 +309,13 @@ export function RateFlow({
             disabled={pending}
             className="w-full rounded-xl bg-accent py-3 font-semibold text-white disabled:opacity-60"
           >
-            {pending ? "Saving…" : others.length ? "Next: compare" : "Save rating"}
+            {pending
+              ? "Saving…"
+              : flow === "edit"
+                ? "Save changes"
+                : others.length
+                  ? "Next: compare"
+                  : "Save rating"}
           </button>
         </section>
       )}
@@ -279,7 +331,7 @@ export function RateFlow({
             <CompareCard
               code={course.code}
               title={course.title}
-              tag="New"
+              tag={flow === "rerank" ? "Re-ranking" : "New"}
               disabled={pending}
               onClick={() => pick(answer(search, true))}
             />
@@ -307,25 +359,48 @@ export function RateFlow({
             bucket={bucket!}
             size="lg"
           />
-          <h1 className="mt-4 text-2xl font-bold">Rated {course.code}</h1>
+          <h1 className="mt-4 text-2xl font-bold">
+            {{ new: "Rated", rerank: "Re-ranked", edit: "Saved notes for" }[flow]} {course.code}
+          </h1>
           <p className="mt-1 text-muted">
             {result.total >= UNLOCK_AT
-              ? `It scores ${result.score.toFixed(1)} among your ${result.total} courses.`
+              ? flow === "rerank" && original && original.score !== result.score
+                ? `It moved from ${original.score.toFixed(1)} to ${result.score.toFixed(1)}.`
+                : `It scores ${result.score.toFixed(1)} among your ${result.total} courses.`
               : `Rate ${UNLOCK_AT - result.total} more to unlock your scores.`}
           </p>
           <div className="mt-8 grid w-full gap-2">
-            <Link
-              href="/rate"
-              className="rounded-xl bg-accent py-3 text-center font-semibold text-white"
-            >
-              Rate another
-            </Link>
-            <Link
-              href={`/course/${course.id}`}
-              className="rounded-xl border border-line bg-surface py-3 text-center font-semibold"
-            >
-              View course
-            </Link>
+            {flow === "new" ? (
+              <>
+                <Link
+                  href="/rate"
+                  className="rounded-xl bg-accent py-3 text-center font-semibold text-white"
+                >
+                  Rate another
+                </Link>
+                <Link
+                  href={`/course/${course.id}`}
+                  className="rounded-xl border border-line bg-surface py-3 text-center font-semibold"
+                >
+                  View course
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href={`/course/${course.id}`}
+                  className="rounded-xl bg-accent py-3 text-center font-semibold text-white"
+                >
+                  View course
+                </Link>
+                <Link
+                  href="/lists"
+                  className="rounded-xl border border-line bg-surface py-3 text-center font-semibold"
+                >
+                  My rankings
+                </Link>
+              </>
+            )}
           </div>
         </section>
       )}

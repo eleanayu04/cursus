@@ -53,15 +53,32 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
 
       <div className="px-4">
         {mine ? (
-          <Card className="flex items-center gap-3 p-4">
-            <ScoreBadge score={unlocked ? mine.score : null} bucket={mine.bucket} />
-            <div className="min-w-0">
-              <div className="font-semibold">Your rating · {BUCKETS[mine.bucket].label}</div>
-              <div className="text-sm text-muted">
-                {unlocked
-                  ? `Notes visible to: ${VISIBILITY_LABELS[mine.visibility]}`
-                  : `Score unlocks after ${UNLOCK_AT} ratings (${count}/${UNLOCK_AT})`}
+          <Card className="p-4">
+            <div className="flex items-center gap-3">
+              <ScoreBadge score={unlocked ? mine.score : null} bucket={mine.bucket} />
+              <div className="min-w-0">
+                <div className="font-semibold">Your rating · {BUCKETS[mine.bucket].label}</div>
+                <div className="text-sm text-muted">
+                  {unlocked
+                    ? `Notes visible to: ${VISIBILITY_LABELS[mine.visibility]}`
+                    : `Score unlocks after ${UNLOCK_AT} ratings (${count}/${UNLOCK_AT})`}
+                </div>
               </div>
+            </div>
+            <NoteDetails n={mine} />
+            <div className="mt-3 flex gap-2">
+              <Link
+                href={`/rate/${course.id}?mode=rerank`}
+                className="flex-1 rounded-xl border border-line py-2 text-center text-sm font-semibold"
+              >
+                Re-rank
+              </Link>
+              <Link
+                href={`/rate/${course.id}?mode=edit`}
+                className="flex-1 rounded-xl border border-line py-2 text-center text-sm font-semibold"
+              >
+                Edit notes
+              </Link>
             </div>
           </Card>
         ) : (

@@ -1,5 +1,5 @@
 import "server-only";
-import { query, queryOne, transaction } from "./db";
+import { pool, query, queryOne, transaction } from "./db";
 import type { Bucket, Visibility } from "./rating";
 
 // Every function that returns another user's data decides here what leaves
@@ -212,6 +212,100 @@ export async function submitRating(userId: string, input: RatingInput) {
     );
     return result.rows[0];
   });
+}
+
+/**
+ * Moves an existing rating to `rank` within `bucket` (which may be its current
+ * bucket), with `rank` counted among the user's *other* courses in that bucket.
+ * Closes the gap it leaves, opens one where it lands, rescores both buckets.
+ */
+export async function rerankRating(userId: string, input: RatingInput) {
+  return transaction(async (db) => {
+    await db.query("select pg_advisory_xact_lock(hashtext($1))", [userId]);
+
+    const { rows: current } = await db.query<{ bucket: Bucket; rank: number }>(
+      "select bucket, rank from ratings where user_id = $1 and course_id = $2",
+      [userId, input.courseId],
+    );
+    if (!current[0]) throw new Error("You haven't rated this course yet.");
+    const old = current[0];
+
+    // take it out of its old spot
+    await db.query(
+      "update ratings set rank = rank - 1 where user_id = $1 and bucket = $2 and rank > $3",
+      [userId, old.bucket, old.rank],
+    );
+
+    const { rows } = await db.query<{ n: number }>(
+      `select count(*)::int as n from ratings
+       where user_id = $1 and bucket = $2 and course_id <> $3`,
+      [userId, input.bucket, input.courseId],
+    );
+    if (!Number.isInteger(input.rank) || input.rank < 0 || input.rank > rows[0].n) {
+      throw new Error("Your rankings changed while you were comparing. Please try again.");
+    }
+
+    // make room in the new spot, then move it there
+    await db.query(
+      `update ratings set rank = rank + 1
+       where user_id = $1 and bucket = $2 and rank >= $3 and course_id <> $4`,
+      [userId, input.bucket, input.rank, input.courseId],
+    );
+    await db.query(
+      `update ratings set bucket = $3, rank = $4, professor = $5, semester = $6,
+              workload = $7, attendance = $8, grading = $9, note = $10, visibility = $11
+       where user_id = $1 and course_id = $2`,
+      [
+        userId,
+        input.courseId,
+        input.bucket,
+        input.rank,
+        input.professor,
+        input.semester,
+        input.workload,
+        input.attendance,
+        input.grading,
+        input.note,
+        input.visibility,
+      ],
+    );
+    await db.query("select rescore_bucket($1, $2)", [userId, old.bucket]);
+    if (input.bucket !== old.bucket) {
+      await db.query("select rescore_bucket($1, $2)", [userId, input.bucket]);
+    }
+
+    const result = await db.query<{ score: number; total: number }>(
+      `select score, (select count(*)::int from ratings where user_id = $1) as total
+       from ratings where user_id = $1 and course_id = $2`,
+      [userId, input.courseId],
+    );
+    return result.rows[0];
+  });
+}
+
+/** Changes notes and who can see them; the ranking stays put. */
+export async function updateRatingNotes(
+  userId: string,
+  courseId: number,
+  notes: NoteFields & { visibility: Visibility },
+) {
+  const { rowCount } = await pool.query(
+    `update ratings set professor = $3, semester = $4, workload = $5, attendance = $6,
+            grading = $7, note = $8, visibility = $9
+     where user_id = $1 and course_id = $2`,
+    [
+      userId,
+      courseId,
+      notes.professor,
+      notes.semester,
+      notes.workload,
+      notes.attendance,
+      notes.grading,
+      notes.note,
+      notes.visibility,
+    ],
+  );
+  if (!rowCount) throw new Error("You haven't rated this course yet.");
 }
 
 // ---------------------------------------------------------------------------
