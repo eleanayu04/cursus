@@ -518,6 +518,20 @@ export async function isWanted(userId: string, courseId: number) {
   ));
 }
 
+/** The courses this user has saved or rated, for marking up search results. */
+export async function myCourseMarks(userId: string) {
+  const [wanted, rated] = await Promise.all([
+    query<{ id: number }>("select course_id::int as id from want_list where user_id = $1", [
+      userId,
+    ]),
+    query<{ id: number }>("select course_id::int as id from ratings where user_id = $1", [userId]),
+  ]);
+  return {
+    wanted: new Set(wanted.map((r) => r.id)),
+    rated: new Set(rated.map((r) => r.id)),
+  };
+}
+
 export async function setWanted(userId: string, courseId: number, wanted: boolean) {
   await query(
     wanted

@@ -1,22 +1,33 @@
 import Link from "next/link";
-import { listSubjects, searchCourses } from "@/lib/queries";
+import { toggleWant } from "@/app/actions";
+import { listSubjects, myCourseMarks, searchCourses } from "@/lib/queries";
+import { SaveCourseButton } from "./SaveCourseButton";
 import { Card, CourseRow, Empty } from "./ui";
 
-/** Search box + subject chips + results. Rows link to `${linkBase}/${id}`. */
+/**
+ * Search box + subject chips + results. Rows link to `${linkBase}/${id}`.
+ * Pass `saveFor` (a user id) to show a Want to take bookmark on courses they haven't rated.
+ */
 export async function CourseSearch({
   basePath,
   linkBase,
   q = "",
   subject,
   placeholder = "Search courses, e.g. ECON 201 or Data Structures",
+  saveFor,
 }: {
   basePath: string;
   linkBase: string;
   q?: string;
   subject?: string;
   placeholder?: string;
+  saveFor?: string;
 }) {
-  const [subjects, results] = await Promise.all([listSubjects(), searchCourses(q, subject)]);
+  const [subjects, results, marks] = await Promise.all([
+    listSubjects(),
+    searchCourses(q, subject),
+    saveFor ? myCourseMarks(saveFor) : null,
+  ]);
   const searching = q.trim() !== "" || !!subject;
 
   return (
@@ -56,9 +67,21 @@ export async function CourseSearch({
       {searching ? (
         results.length ? (
           <Card className="mx-4 mt-3 divide-y divide-line overflow-hidden">
-            {results.map((c) => (
-              <CourseRow key={c.id} course={c} href={`${linkBase}/${c.id}`} />
-            ))}
+            {results.map((c) => {
+              const row = <CourseRow course={c} href={`${linkBase}/${c.id}`} />;
+              if (!marks || marks.rated.has(Number(c.id))) return <div key={c.id}>{row}</div>;
+              const saved = marks.wanted.has(Number(c.id));
+              return (
+                <div key={c.id} className="flex items-center">
+                  <div className="min-w-0 flex-1">{row}</div>
+                  <SaveCourseButton
+                    code={c.code}
+                    saved={saved}
+                    action={toggleWant.bind(null, c.id, !saved)}
+                  />
+                </div>
+              );
+            })}
           </Card>
         ) : (
           <Empty>No courses match “{q}”.</Empty>

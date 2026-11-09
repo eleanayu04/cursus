@@ -81,7 +81,7 @@ export default async function ListsPage({
         </Card>
       ) : (
         <Empty>
-          Bookmark courses you&apos;re considering from any course page with “Want to take”.
+          Tap the bookmark next to a course in Search, or “Want to take” on its page.
         </Empty>
       )}
     </>
