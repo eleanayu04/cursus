@@ -26,6 +26,7 @@ export default async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // /health stays out so Floo's health check passes with no session.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt|health$).*)"],
+  // /health stays out so Floo's health check passes with no session. The icons
+  // stay out so the browser tab shows them on the sign-in page too.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png|robots.txt|health$).*)"],
 };
