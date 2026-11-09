@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 export function CopyLink({ path }: { path: string }) {
   const [url, setUrl] = useState(path);
   const [copied, setCopied] = useState(false);
+  // The origin only exists in the browser, so it can't be part of the first render.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setUrl(window.location.origin + path), [path]);
 
   return (

@@ -5,9 +5,12 @@ Next.js (App Router) + Postgres, deployed on [Floo](https://getfloo.com).
 
 ## How it works
 
-- **Sign-in**: Floo accounts mode. Floo's gateway signs people in (invite-only)
-  and passes `X-Floo-User-*` headers; `src/lib/auth.ts` maps them to a Cursus
-  user. Only `@duke.edu` accounts get in, plus app admins for testing.
+- **Sign-in**: [Floo User accounts](https://getfloo.com/docs/guides/user-accounts).
+  Floo runs the sign-in service and stores users in the `neon_auth` schema of our
+  Postgres; Cursus renders its own pages (`src/app/auth`) with `@neon/auth`, and
+  `src/proxy.ts` keeps the app behind sign-in. `src/lib/auth.ts` maps a verified
+  email to a Cursus user. Anyone can sign up, but only `@duke.edu` addresses (plus
+  `ADMIN_EMAILS`, for testing) get past `/duke-only`.
 - **Rating**: pick Liked / Fine / Disliked, add optional notes, then answer
   head-to-head comparisons against your other courses in that bucket (binary
   insertion, `src/lib/rating.ts`). Scores are spread evenly across the bucket's
@@ -27,20 +30,23 @@ npm run dev:local
 ```
 
 `dev:local` starts an embedded Postgres (PGlite, stored in `.pglite/`), applies
-migrations, and runs `next dev` on http://localhost:3000. With no Floo gateway
-locally, you're signed in as `DEV_USER_EMAIL` (default `dev@duke.edu`); send an
-`X-Floo-User-Email` header to act as someone else. Delete `.pglite/` to reset
-the database.
+migrations, and runs `next dev` on http://localhost:3000. With no sign-in service
+locally, you're signed in as `DEV_USER_EMAIL` (default `dev@duke.edu`); change it
+to act as someone else. Delete `.pglite/` to reset the database.
 
 ## Deploy to Floo
 
-`floo.app.toml` defines one web service + managed Postgres in accounts mode.
+`floo.app.toml` defines one web service + managed Postgres with User accounts.
 Migrations run automatically on each deploy (`node db/migrate.mjs`).
 
 1. Push this repo to GitHub and connect it: `floo apps github connect`.
-2. Invite users (accounts mode is invite-only):
-   `floo apps invite someone@duke.edu --role member --app cursus`
+2. Set a cookie secret in each environment (dev and prod are separate):
+   `openssl rand -base64 32 | floo env set NEON_AUTH_COOKIE_SECRET --stdin --secret --app cursus --env dev`
 3. Pushes to `main` deploy to dev; a GitHub release promotes to prod.
+
+Dev and prod have separate users, so an account made on dev won't work on prod.
+Google sign-in uses a shared OAuth app that shows Neon's name on its consent
+screen; set your own Google client before launch (see the Floo guide above).
 
 ## Course catalog
 

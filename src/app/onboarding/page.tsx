@@ -10,8 +10,8 @@ export default async function OnboardingPage({
   searchParams: Promise<{ error?: string; next?: string }>;
 }) {
   const user = await getCurrentUser();
-  if (!user) throw new Error("Not signed in");
-  if (!user.isDuke && !user.isAdmin) redirect("/duke-only");
+  if (!user) redirect("/auth/sign-in");
+  if (!user.allowed) redirect("/duke-only");
   const { error, next } = await searchParams;
   const suggested = user.email.split("@")[0].replace(/[^a-z0-9_]/g, "").slice(0, 20);
 
@@ -33,7 +33,7 @@ export default async function OnboardingPage({
             name="full_name"
             required
             maxLength={60}
-            defaultValue={user.full_name ?? user.flooName ?? ""}
+            defaultValue={user.full_name ?? user.authName ?? ""}
             placeholder="First Last"
             className="w-full rounded-xl border border-line bg-surface px-4 py-3 outline-none focus:border-accent"
           />

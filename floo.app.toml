@@ -1,15 +1,9 @@
 [app]
 name = "cursus"
-# Floo's gateway handles sign-in and passes X-Floo-User-* headers.
-# Accounts mode is invite-only: add people with `floo apps invite`.
-access_mode = "accounts"
-
-[auth]
-access_policy = "invite"
-
-[auth.branding]
-display_name = "Cursus"
-accent_color = "#1d3f8f"
+# Floo's gateway no longer locks the app: Cursus handles sign-in itself with
+# Floo User accounts (see [managed.default.users] and src/proxy.ts). Keep this
+# explicit, because leaving it out keeps the environment's current mode.
+access_mode = "public"
 
 [services.web]
 type = "web"
@@ -20,7 +14,12 @@ dev_command = "npm run dev"
 migrate_command = "node db/migrate.mjs"
 
 [services.web.env]
-optional = ["DUKE_API_TOKEN"]
+required = ["NEON_AUTH_COOKIE_SECRET"]
+optional = ["DUKE_API_TOKEN", "ADMIN_EMAILS"]
 
 [managed.default]
 type = "postgres"
+
+[managed.default.users]
+methods = ["email_password", "google"]
+signup = "open"

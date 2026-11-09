@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { safeNext } from "@/lib/access";
 import { getCurrentUser, requireProfile } from "@/lib/auth";
 import { query } from "@/lib/db";
 import {
@@ -19,19 +20,14 @@ import { BUCKETS, VISIBILITY_LABELS, type Visibility } from "@/lib/rating";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
-// Only same-site paths, so ?next= can't bounce people to another domain.
-function safeNext(next: unknown): string {
-  return typeof next === "string" && next.startsWith("/") && !next.startsWith("//") ? next : "/";
-}
-
 // ---------------------------------------------------------------------------
-// Onboarding (sign-in itself is Floo's gateway)
+// Onboarding (sign-in itself is in src/app/auth)
 // ---------------------------------------------------------------------------
 
 export async function completeProfile(formData: FormData) {
   const user = await getCurrentUser();
-  if (!user) throw new Error("Not signed in");
-  if (!user.isDuke && !user.isAdmin) redirect("/duke-only");
+  if (!user) redirect("/auth/sign-in");
+  if (!user.allowed) redirect("/duke-only");
 
   const username = String(formData.get("username") ?? "").trim().toLowerCase().replace(/^@/, "");
   const fullName = String(formData.get("full_name") ?? "").trim();

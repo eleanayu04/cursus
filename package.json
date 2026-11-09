@@ -13,23 +13,23 @@
     "import:courses": "node scripts/import-duke-courses.mjs"
   },
   "dependencies": {
-    "next": "15.5.4",
+    "@neon/auth": "0.8.2",
+    "next": "16.4.5",
     "pg": "^8.23.1",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.12",
     "@electric-sql/pglite-socket": "^0.2.15",
-    "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/pg": "^8.23.1",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "eslint": "^9",
-    "eslint-config-next": "15.5.4",
+    "eslint-config-next": "^16.4.5",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

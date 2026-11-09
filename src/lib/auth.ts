@@ -1,16 +1,16 @@
 import "server-only";
 import { cache } from "react";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { canUseCursus } from "./access";
 import { queryOne } from "./db";
+import { getAuth, usesDevUser } from "./neon-auth";
 
-// Sign-in is Floo accounts mode: Floo's gateway authenticates every request
-// and passes the user's identity in X-Floo-User-* headers. Cursus keeps its
-// own users row (username, name) keyed by that email.
+// Sign-in is Floo User accounts (see neon-auth.ts). Cursus keeps its own users
+// row (username, name) keyed by the verified email, so anyone who signs in with
+// an email Cursus already knows gets their existing ratings and friends.
 //
-// Locally there's no gateway, so in development a request without headers
-// acts as DEV_USER_EMAIL (default dev@duke.edu). Send X-Floo-User-Email
-// yourself, or use `floo dev --fixture-user`, to act as someone else.
+// Locally there's no sign-in service, so requests act as DEV_USER_EMAIL
+// (default dev@duke.edu).
 
 export type User = {
   id: string;
@@ -20,23 +20,23 @@ export type User = {
 };
 export type Profile = User & { username: string; full_name: string };
 
-type FlooIdentity = { email: string; name: string | null; role: string | null };
+type Identity = { email: string; name: string | null };
 
-async function flooIdentity(): Promise<FlooIdentity | null> {
-  const h = await headers();
-  const email = h.get("x-floo-user-email")?.trim().toLowerCase();
-  if (email) {
-    return { email, name: h.get("x-floo-user-name"), role: h.get("x-floo-user-role") };
+async function currentIdentity(): Promise<Identity | null> {
+  if (usesDevUser()) {
+    return { email: (process.env.DEV_USER_EMAIL ?? "dev@duke.edu").toLowerCase(), name: null };
   }
-  if (process.env.NODE_ENV !== "production") {
-    return { email: (process.env.DEV_USER_EMAIL ?? "dev@duke.edu").toLowerCase(), name: null, role: "admin" };
-  }
-  return null;
+  const { data } = await getAuth().getSession();
+  const user = data?.user;
+  // Email is the key to someone's data and to the Duke check, so it has to be
+  // one they've proven they own.
+  if (!user?.email || !user.emailVerified) return null;
+  return { email: user.email.trim().toLowerCase(), name: user.name || null };
 }
 
-/** The signed-in Floo user, as a Cursus users row (created on first visit). */
-export const getCurrentUser = cache(async (): Promise<(User & { isDuke: boolean; isAdmin: boolean; flooName: string | null }) | null> => {
-  const id = await flooIdentity();
+/** The signed-in user, as a Cursus users row (created on first visit). */
+export const getCurrentUser = cache(async (): Promise<(User & { allowed: boolean; authName: string | null }) | null> => {
+  const id = await currentIdentity();
   if (!id) return null;
   const user =
     (await queryOne<User>(
@@ -50,25 +50,14 @@ export const getCurrentUser = cache(async (): Promise<(User & { isDuke: boolean;
       [id.email],
     ));
   if (!user) return null;
-  // Floo uses the email as the name when none is set.
-  const flooName = id.name && id.name.toLowerCase() !== id.email ? id.name : null;
-  return {
-    ...user,
-    isDuke: id.email.endsWith("@duke.edu"),
-    isAdmin: id.role === "admin",
-    flooName,
-  };
+  return { ...user, allowed: canUseCursus(id.email), authName: id.name };
 });
 
-/**
- * For pages behind sign-in. Cursus is for Duke students, so anyone Floo lets
- * in without a @duke.edu email is turned away, except app admins (you, the
- * owner, testing with a non-Duke Floo account).
- */
+/** For pages and actions behind sign-in. Cursus is for Duke students only. */
 export async function requireProfile(): Promise<Profile> {
   const user = await getCurrentUser();
-  if (!user) throw new Error("No Floo identity on this request. Is access_mode = \"accounts\"?");
-  if (!user.isDuke && !user.isAdmin) redirect("/duke-only");
+  if (!user) redirect("/auth/sign-in");
+  if (!user.allowed) redirect("/duke-only");
   if (!user.username || !user.full_name) redirect("/onboarding");
   return user as Profile;
 }
