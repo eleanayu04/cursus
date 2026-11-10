@@ -127,13 +127,6 @@ export function AuthFlow({ start, next }: { start: "sign-in" | "sign-up" | "forg
     setNotice("New code sent.");
   };
 
-  const google = async (): Promise<Outcome> => {
-    // On success the browser leaves for Google.
-    const { error } = await auth.signIn.social({ provider: "google", callbackURL: next });
-    if (error) return "Couldn't start Google sign-in. Try again, or use your email and password.";
-    return new Promise<void>(() => {});
-  };
-
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const steps = { "sign-in": signIn, "sign-up": signUp, verify, forgot: requestReset, reset };
@@ -203,17 +196,6 @@ export function AuthFlow({ start, next }: { start: "sign-in" | "sign-up" | "forg
             : { "sign-in": "Sign in", "sign-up": "Create account", verify: "Verify email", forgot: "Send code", reset: "Set new password" }[step]}
         </button>
       </form>
-
-      {(step === "sign-in" || step === "sign-up") && (
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => run(google)}
-          className="mt-3 w-full rounded-xl border border-line bg-surface py-3 font-semibold disabled:opacity-60"
-        >
-          Continue with Google
-        </button>
-      )}
 
       <div className="mt-6 space-y-2 text-center text-sm text-muted">
         {step === "sign-in" && (

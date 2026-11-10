@@ -45,9 +45,9 @@ Migrations run automatically on each deploy (`node db/migrate.mjs`).
 2. Pushes to `main` deploy to dev; a GitHub release promotes to prod.
 
 Dev and prod have separate users, so an account made on dev won't work on prod.
-Google sign-in needs our own Google OAuth client in each environment, with the
-callback `https://<host>/api/auth/callback/google`; until Floo has its client id
-and secret, the Google button fails (see the Floo guide above).
+Sign-in is email and password only. Google sign-in was removed when Floo took
+over sign-in; accounts that only used Google set a password with "Forgot
+password". Adding a provider back needs our own OAuth client (see the Floo guide).
 
 To try sign-in without a mailbox, use a throwaway Floo app whose
 `allowed_email_domains` also lists `test.getfloo.app`: any `@test.getfloo.app`

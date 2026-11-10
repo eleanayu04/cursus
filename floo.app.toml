@@ -21,7 +21,9 @@ type = "postgres"
 
 # Floo serves sign-in at /api/auth on our domain; users live in floo_auth.
 [managed.default.users]
-methods = ["email_password", "google"]
+# Email and password only: Duke email is Microsoft 365, so Google sign-in was
+# dropped. Google-only accounts set a password once with "Forgot password".
+methods = ["email_password"]
 signup = "open"
 # New sign-ups need a Duke address. Existing accounts (like ADMIN_EMAILS) keep working.
 allowed_email_domains = ["duke.edu"]
