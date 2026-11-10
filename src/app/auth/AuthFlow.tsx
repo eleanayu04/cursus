@@ -85,9 +85,9 @@ export function AuthFlow({ start, next }: { start: "sign-in" | "sign-up" | "forg
   const signUp = async (): Promise<Outcome> => {
     const cleanName = name.trim().slice(0, 60);
     if (!cleanName) return "Enter your name.";
-    // Floo refuses other addresses too (allowed_email_domains); this just says so sooner.
-    if (!address().endsWith("@duke.edu")) return "Cursus is for Duke students. Use your @duke.edu email.";
     const { data, error } = await auth.signUp.email({ email: address(), password, name: cleanName });
+    // Floo refuses addresses outside allowed_email_domains (floo.app.toml) with a 403.
+    if (error?.status === 403) return "Cursus is for Duke students. Use your @duke.edu email.";
     if (error) return say(error, "Couldn't create your account. Try again.");
     // Floo emails the code itself on sign-up.
     if (!data?.token) {
