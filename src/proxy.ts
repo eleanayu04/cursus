@@ -1,27 +1,31 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getAuth, usesDevUser } from "@/lib/neon-auth";
+import { fetchSession, usesDevUser } from "@/lib/session";
 
 const SIGN_IN = "/auth/sign-in";
+
+// Sign-in pages, and Floo's /api/auth in case a request for it reaches us.
+const isPublic = (path: string) =>
+  path === "/auth" || path.startsWith("/auth/") || path === "/api/auth" || path.startsWith("/api/auth/");
 
 // The app is public at the Floo level, so this is what keeps it behind sign-in.
 // Pages and server actions also check via requireProfile().
 export default async function proxy(request: NextRequest) {
-  if (usesDevUser()) return NextResponse.next();
-
-  // Sign-in, sign-up and /api/auth are public by default in the SDK.
-  const response = await getAuth().middleware({ loginUrl: SIGN_IN })(request);
-
-  // The SDK drops the path when it redirects to sign-in. Keep it, so invite
-  // links still land where they point once the person has signed in.
-  const location = response.headers.get("location");
   const { pathname, search } = request.nextUrl;
-  if (location && request.method === "GET" && pathname !== "/" && new URL(location, request.url).pathname === SIGN_IN) {
-    // Next rejects a relative Location from a proxy, so this has to be absolute.
-    const target = new URL(`${SIGN_IN}?next=${encodeURIComponent(pathname + search)}`, request.url);
-    const withNext = NextResponse.redirect(target, response.status);
-    for (const cookie of response.headers.getSetCookie()) withNext.headers.append("set-cookie", cookie);
-    return withNext;
+  if (usesDevUser() || isPublic(pathname)) return NextResponse.next();
+
+  const { session, setCookies } = await fetchSession(request.headers.get("cookie") ?? "");
+
+  let response: NextResponse;
+  if (session) {
+    response = NextResponse.next();
+  } else {
+    // Keep the path, so invite links still land where they point once the
+    // person has signed in. Next rejects a relative Location here.
+    const target = new URL(SIGN_IN, request.url);
+    if (request.method === "GET" && pathname !== "/") target.searchParams.set("next", pathname + search);
+    response = NextResponse.redirect(target);
   }
+  for (const cookie of setCookies) response.headers.append("set-cookie", cookie);
   return response;
 }
 

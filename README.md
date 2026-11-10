@@ -6,10 +6,12 @@ Next.js (App Router) + Postgres, deployed on [Floo](https://getfloo.com).
 ## How it works
 
 - **Sign-in**: [Floo User accounts](https://getfloo.com/docs/guides/user-accounts).
-  Floo runs the sign-in service and stores users in the `neon_auth` schema of our
-  Postgres; Cursus renders its own pages (`src/app/auth`) with `@neon/auth`, and
-  `src/proxy.ts` keeps the app behind sign-in. `src/lib/auth.ts` maps a verified
-  email to a Cursus user. Anyone can sign up, but only `@duke.edu` addresses (plus
+  Floo runs the sign-in service (Better Auth) at `/api/auth` on our own domain and
+  stores users in the `floo_auth` schema of our Postgres. Cursus renders its own
+  pages (`src/app/auth`) with the `better-auth` client; on the server,
+  `src/lib/session.ts` asks Floo for the session and `src/proxy.ts` keeps the app
+  behind sign-in. `src/lib/auth.ts` maps a verified email to a Cursus user. Only
+  `@duke.edu` addresses can sign up (`allowed_email_domains`), and only they (plus
   `ADMIN_EMAILS`, for testing) get past `/duke-only`.
 - **Rating**: pick Liked / Fine / Disliked, add optional notes, then answer
   head-to-head comparisons against your other courses in that bucket (binary
@@ -40,13 +42,16 @@ to act as someone else. Delete `.pglite/` to reset the database.
 Migrations run automatically on each deploy (`node db/migrate.mjs`).
 
 1. Push this repo to GitHub and connect it: `floo apps github connect`.
-2. Set a cookie secret in each environment (dev and prod are separate):
-   `openssl rand -base64 32 | floo env set NEON_AUTH_COOKIE_SECRET --stdin --secret --app cursus --env dev`
-3. Pushes to `main` deploy to dev; a GitHub release promotes to prod.
+2. Pushes to `main` deploy to dev; a GitHub release promotes to prod.
 
 Dev and prod have separate users, so an account made on dev won't work on prod.
-Google sign-in uses a shared OAuth app that shows Neon's name on its consent
-screen; set your own Google client before launch (see the Floo guide above).
+Google sign-in needs our own Google OAuth client in each environment, with the
+callback `https://<host>/api/auth/callback/google`; until Floo has its client id
+and secret, the Google button fails (see the Floo guide above).
+
+To try sign-in without a mailbox, use a throwaway Floo app whose
+`allowed_email_domains` also lists `test.getfloo.app`: any `@test.getfloo.app`
+address verifies there with the code `000000`.
 
 ## Course catalog
 

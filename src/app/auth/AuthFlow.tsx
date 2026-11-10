@@ -1,19 +1,8 @@
 "use client";
 
-import { createAuthClient } from "@neon/auth/next";
 import Link from "next/link";
-import { useState, useTransition, type FormEvent } from "react";
-import {
-  requestPasswordReset,
-  resendCode,
-  resetPassword,
-  signIn,
-  signUp,
-  verifyEmail,
-  type AuthResult,
-} from "./actions";
-
-const authClient = createAuthClient();
+import { useState, type FormEvent } from "react";
+import { auth } from "@/lib/auth-client";
 
 type Step = "sign-in" | "sign-up" | "verify" | "forgot" | "reset";
 
@@ -26,6 +15,12 @@ const HEADINGS: Record<Step, { title: string; subtitle: string }> = {
 };
 
 const INPUT = "w-full rounded-xl border border-line bg-surface px-4 py-3 outline-none focus:border-accent";
+const CODE_FAILED = "That code didn't work. Check it, or send a new one.";
+
+// Each step returns an error to show, or nothing when it has moved on.
+type Outcome = string | void;
+type AuthError = { message?: string } | null;
+const say = (error: AuthError, fallback: string) => error?.message || fallback;
 
 function Field({
   label,
@@ -49,49 +44,100 @@ export function AuthFlow({ start, next }: { start: "sign-in" | "sign-up" | "forg
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
 
-  const run = (action: () => Promise<AuthResult>, onOk?: () => void) => {
+  const address = () => email.trim().toLowerCase();
+
+  // A full page load, so the server sees the new session cookie.
+  const finish = () => {
+    window.location.assign(next);
+    return new Promise<void>(() => {}); // stay pending while the page changes
+  };
+
+  const run = async (step: () => Promise<Outcome>) => {
     setError(null);
     setNotice(null);
-    startTransition(async () => {
-      const result = await action();
-      if (result.needsVerification) setStep("verify");
-      else if (result.error) setError(result.error);
-      else if (result.ok) onOk?.();
-    });
+    setPending(true);
+    try {
+      const problem = await step();
+      if (problem) setError(problem);
+    } catch {
+      setError("Something went wrong. Check your connection and try again.");
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const sendVerificationCode = () =>
+    auth.emailOtp.sendVerificationOtp({ email: address(), type: "email-verification" });
+
+  const signIn = async (): Promise<Outcome> => {
+    const { error } = await auth.signIn.email({ email: address(), password });
+    if (error?.code === "EMAIL_NOT_VERIFIED") {
+      await sendVerificationCode();
+      setStep("verify");
+      return;
+    }
+    if (error) return say(error, "Couldn't sign you in. Try again.");
+    return finish();
+  };
+
+  const signUp = async (): Promise<Outcome> => {
+    const cleanName = name.trim().slice(0, 60);
+    if (!cleanName) return "Enter your name.";
+    // Floo refuses other addresses too (allowed_email_domains); this just says so sooner.
+    if (!address().endsWith("@duke.edu")) return "Cursus is for Duke students. Use your @duke.edu email.";
+    const { data, error } = await auth.signUp.email({ email: address(), password, name: cleanName });
+    if (error) return say(error, "Couldn't create your account. Try again.");
+    // Floo emails the code itself on sign-up.
+    if (!data?.token) {
+      setStep("verify");
+      return;
+    }
+    return finish();
+  };
+
+  /** Confirms the emailed code, then signs in unless the service already did. */
+  const verify = async (): Promise<Outcome> => {
+    const { data, error } = await auth.emailOtp.verifyEmail({ email: address(), otp: code.trim() });
+    if (error) return CODE_FAILED;
+    if (!data?.token) {
+      const signedIn = await auth.signIn.email({ email: address(), password });
+      if (signedIn.error) return "Email verified. Go back and sign in.";
+    }
+    return finish();
+  };
+
+  const requestReset = async (): Promise<Outcome> => {
+    const { error } = await auth.emailOtp.requestPasswordReset({ email: address() });
+    if (error) return say(error, "Couldn't send a reset code.");
+    setPassword("");
+    setStep("reset");
+  };
+
+  const reset = async (): Promise<Outcome> => {
+    const { error } = await auth.emailOtp.resetPassword({ email: address(), otp: code.trim(), password });
+    if (error) return CODE_FAILED;
+    return signIn();
+  };
+
+  const resend = async (): Promise<Outcome> => {
+    const { error } = await sendVerificationCode();
+    if (error) return say(error, "Couldn't send a new code.");
+    setNotice("New code sent.");
+  };
+
+  const google = async (): Promise<Outcome> => {
+    // On success the browser leaves for Google.
+    const { error } = await auth.signIn.social({ provider: "google", callbackURL: next });
+    if (error) return "Couldn't start Google sign-in. Try again, or use your email and password.";
+    return new Promise<void>(() => {});
   };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (step === "sign-in") run(() => signIn({ email, password, next }));
-    if (step === "sign-up") run(() => signUp({ name, email, password, next }));
-    if (step === "verify") run(() => verifyEmail({ email, code, password, next }));
-    if (step === "forgot") {
-      run(
-        () => requestPasswordReset({ email }),
-        () => {
-          setPassword("");
-          setStep("reset");
-        },
-      );
-    }
-    if (step === "reset") run(() => resetPassword({ email, code, password, next }));
-  };
-
-  const google = () => {
-    setError(null);
-    startTransition(async () => {
-      // The browser SDK throws on failure, rather than returning an error.
-      try {
-        await authClient.signIn.social({
-          provider: "google",
-          callbackURL: `${window.location.origin}${next}`,
-        });
-      } catch {
-        setError("Couldn't start Google sign-in. Try again, or use your email and password.");
-      }
-    });
+    const steps = { "sign-in": signIn, "sign-up": signUp, verify, forgot: requestReset, reset };
+    run(steps[step]);
   };
 
   const query = next === "/" ? "" : `?next=${encodeURIComponent(next)}`;
@@ -162,7 +208,7 @@ export function AuthFlow({ start, next }: { start: "sign-in" | "sign-up" | "forg
         <button
           type="button"
           disabled={pending}
-          onClick={google}
+          onClick={() => run(google)}
           className="mt-3 w-full rounded-xl border border-line bg-surface py-3 font-semibold disabled:opacity-60"
         >
           Continue with Google
@@ -194,12 +240,7 @@ export function AuthFlow({ start, next }: { start: "sign-in" | "sign-up" | "forg
           </p>
         )}
         {step === "verify" && (
-          <button
-            type="button"
-            disabled={pending}
-            className="font-semibold text-accent"
-            onClick={() => run(() => resendCode({ email }), () => setNotice("New code sent."))}
-          >
+          <button type="button" disabled={pending} className="font-semibold text-accent" onClick={() => run(resend)}>
             Send a new code
           </button>
         )}

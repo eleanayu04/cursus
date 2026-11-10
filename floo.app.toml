@@ -14,12 +14,14 @@ dev_command = "npm run dev"
 migrate_command = "node db/migrate.mjs"
 
 [services.web.env]
-required = ["NEON_AUTH_COOKIE_SECRET"]
 optional = ["DUKE_API_TOKEN", "ADMIN_EMAILS"]
 
 [managed.default]
 type = "postgres"
 
+# Floo serves sign-in at /api/auth on our domain; users live in floo_auth.
 [managed.default.users]
 methods = ["email_password", "google"]
 signup = "open"
+# New sign-ups need a Duke address. Existing accounts (like ADMIN_EMAILS) keep working.
+allowed_email_domains = ["duke.edu"]

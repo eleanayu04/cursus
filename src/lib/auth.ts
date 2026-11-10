@@ -1,11 +1,12 @@
 import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { canUseCursus } from "./access";
 import { queryOne } from "./db";
-import { getAuth, usesDevUser } from "./neon-auth";
+import { fetchSession, usesDevUser } from "./session";
 
-// Sign-in is Floo User accounts (see neon-auth.ts). Cursus keeps its own users
+// Sign-in is Floo User accounts (see session.ts). Cursus keeps its own users
 // row (username, name) keyed by the verified email, so anyone who signs in with
 // an email Cursus already knows gets their existing ratings and friends.
 //
@@ -26,8 +27,8 @@ async function currentIdentity(): Promise<Identity | null> {
   if (usesDevUser()) {
     return { email: (process.env.DEV_USER_EMAIL ?? "dev@duke.edu").toLowerCase(), name: null };
   }
-  const { data } = await getAuth().getSession();
-  const user = data?.user;
+  const { session } = await fetchSession((await headers()).get("cookie") ?? "");
+  const user = session?.user;
   // Email is the key to someone's data and to the Duke check, so it has to be
   // one they've proven they own.
   if (!user?.email || !user.emailVerified) return null;
